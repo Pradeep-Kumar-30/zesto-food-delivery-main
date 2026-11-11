@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useState } from 'react';
 import { FaRegEye } from "react-icons/fa";
 import { FaRegEyeSlash } from "react-icons/fa";
@@ -6,7 +6,7 @@ import { FcGoogle } from "react-icons/fc";
 import { useNavigate } from 'react-router-dom';
 import axios from "axios"
 import { serverUrl } from '../apiConfig';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth } from '../../firebase.js';
 import { ClipLoader } from 'react-spinners';
 import { useDispatch } from 'react-redux';
@@ -48,26 +48,42 @@ function SignIn() {
         }
     }
 
+    // Handle redirect result on page load (after Google redirect back)
+    useEffect(() => {
+        const handleRedirectResult = async () => {
+            try {
+                const result = await getRedirectResult(auth)
+                if (result && result.user) {
+                    setGoogleLoading(true)
+                    const { data } = await axios.post(`${serverUrl}/api/auth/google-auth`, {
+                        fullName: result.user.displayName,
+                        email: result.user.email,
+                    }, { withCredentials: true })
+                    dispatch(setUserData(data))
+                    navigate("/")
+                }
+            } catch (error) {
+                console.error("Redirect result error:", error)
+                setErr(error?.message || "Google sign in failed")
+            } finally {
+                setGoogleLoading(false)
+            }
+        }
+        handleRedirectResult()
+    }, [])
+
     const handleGoogleAuth = async () => {
         setGoogleLoading(true)
         setErr("")
         try {
             const provider = new GoogleAuthProvider()
-            const result = await signInWithPopup(auth, provider)
-            const { data } = await axios.post(`${serverUrl}/api/auth/google-auth`, {
-                fullName: result.user.displayName,
-                email: result.user.email,
-            }, { withCredentials: true })
-            dispatch(setUserData(data))
-            setGoogleLoading(false)
-            navigate("/")
+            provider.setCustomParameters({ prompt: 'select_account' })
+            // Use redirect (works in all browsers/environments, no popup-blocked issue)
+            await signInWithRedirect(auth, provider)
+            // Page will redirect to Google, then come back — handled by useEffect above
         } catch (error) {
-            const data = error?.response?.data
-            const fromApi =
-                (typeof data?.message === "string" && data.message) ||
-                (typeof data === "string" && data)
             const fromFirebase = error?.code ? `${error.code}: ${error.message || ""}` : ""
-            setErr(fromApi || fromFirebase || error?.message || "Google sign in failed")
+            setErr(fromFirebase || error?.message || "Google sign in failed")
             setGoogleLoading(false)
             console.error(error)
         }
