@@ -11,10 +11,7 @@ services:
       - key: PORT
         value: 10000
       - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: zesto-frontend
-          property: url
+        sync: false
       - key: MONGODB_URL
         sync: false
       - key: JWT_SECRET
@@ -50,10 +47,7 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: zesto-backend
-          property: url
+        sync: false
       - key: VITE_GEOAPIKEY
         value: 6c76ef49f72d4455b0ab677cd63145cb
       - key: VITE_RAZORPAY_KEY_ID
